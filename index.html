@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video to Audio Converter</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(to right, #f0f4f8, #ffffff);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .title {
+            background: linear-gradient(to right, #2563eb, #7c3aed);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-container {
+            background: white;
+            border: 2px dashed #2563eb;
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 2rem 0;
+            transition: all 0.3s ease;
+        }
+
+        .upload-container.dragover {
+            background: #f0f7ff;
+            border-color: #3b82f6;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #2563eb;
+            margin-bottom: 1rem;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .select-button {
+            background: #2563eb;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .select-button:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        .download-button {
+            display: none;
+            width: 100%;
+            max-width: 300px;
+            margin: 1rem auto;
+            padding: 1rem;
+            background: linear-gradient(to right, #2563eb, #7c3aed);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .download-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .success-message {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 1rem;
+            border-radius: 6px;
+            animation: fadeInOut 3s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        #audioPreview {
+            width: 100%;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .loading {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Video to Audio Converter</h1>
+        <p>Extract high-quality audio from any video file in seconds</p>
+
+        <div class="upload-container" id="dropZone">
+            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+            <h3>Drag & Drop your video here</h3>
+            <p>or</p>
+            <input type="file" id="fileInput" accept="video/*">
+            <button class="select-button" onclick="document.getElementById('fileInput').click()">
+                Select Video
+            </button>
+        </div>
+
+        <div class="loading" id="loading"></div>
+        <audio id="audioPreview" controls></audio>
+        <button class="download-button" id="downloadButton">
+            <i class="fas fa-download"></i> Download MP3
+        </button>
+        <div class="success-message" id="successMessage">
+            Download completed successfully!
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const loading = document.getElementById('loading');
+        const audioPreview = document.getElementById('audioPreview');
+        const downloadButton = document.getElementById('downloadButton');
+        const successMessage = document.getElementById('successMessage');
+
+        // Drag and drop handlers
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('video/')) {
+                processVideo(file);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('video/')) {
+                processVideo(file);
+            }
+        });
+
+        function processVideo(file) {
+            loading.style.display = 'block';
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(file);
+
+            video.onloadedmetadata = () => {
+                const stream = video.captureStream();
+                const mediaRecorder = new MediaRecorder(stream);
+                const chunks = [];
+
+                mediaRecorder.ondataavailable = (e) => {
+                    chunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(chunks, { type: 'audio/mp3' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    loading.style.display = 'none';
+                    audioPreview.src = audioUrl;
+                    audioPreview.style.display = 'block';
+                    downloadButton.style.display = 'block';
+                    
+                    downloadButton.onclick = () => {
+                        const a = document.createElement('a');
+                        a.href = audioUrl;
+                        a.download = 'extracted-audio.mp3';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        
+                        successMessage.style.display = 'block';
+                        setTimeout(() => {
+                            successMessage.style.display = 'none';
+                        }, 3000);
+                    };
+                };
+
+                video.onplay = () => {
+                    mediaRecorder.start();
+                };
+
+                video.onended = () => {
+                    mediaRecorder.stop();
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                video.play();
+            };
+        }
+
+        // Keyboard shortcut for download
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'd' && downloadButton.style.display === 'block') {
+                downloadButton.click();
+            }
+        });
+    </script>
+</body>
+</html>
